@@ -1,6 +1,7 @@
 /************************************************
  * Shelly 2PM Gen4 -> Domoticz MQTT bridge
- * Ver 1.1
+ * MQTT Bridge
+ * Ver 2.0
  ************************************************/
 
 let DEVICE_NAME = "Vodojem";
@@ -9,10 +10,6 @@ let BASE_TOPIC = "vodojem";
 let DISCOVERY_PREFIX = "homeassistant";
 
 const PERIODIC_MQTTUPDATE = 5 * 60 * 1000;
-const MIN_LEVEL_PERCENT = 5;
-const MAX_PUMP_RUNTIME_MS = 15 * 60 * 1000;
-const PROTECTION_CHECK_MS = 2000;
-const BLOWER_RUNTIME_MS = 15 * 60 * 1000;
 
 /************************************************
  * Internal global variables
@@ -21,14 +18,9 @@ const BLOWER_RUNTIME_MS = 15 * 60 * 1000;
 let lastAnalog = -1;
 let lastTemperature = -100;
 let mqttSubscribed = false;
-let discoveryRunning = false;
-let pumpTimer = null;
-let waterLevelCheckTimer = null;
-let blowerTimer = null;
-
 let mqttReadyTimer1 = null;
 let mqttReadyTimer2 = null;
-
+let discoveryRunning = false;
 let discoveryPublished = false;
 
 /************************************************
@@ -319,93 +311,6 @@ function onMQTTReady() {
 }
 
 /************************************************
- * Pump protection
- ************************************************/
-function stopPump(reason) {
-
-  cleanupPumpProtection();
-  
-  Shelly.call("Switch.Set", {
-    id: 0,
-    on: false
-  });
-
-  print("Pump STOP:", reason);
-}
-
-function checkWaterLevel() {
-
-  Shelly.call("Input.GetStatus", { id: 100 }, function(res, err) {
-
-    if (err || !res || res.percent === undefined)
-      return;
-
-    let percent = res.percent;
-
-    print("Water level check:", percent);
-
-    if (percent < MIN_LEVEL_PERCENT) {
-      stopPump("low water level");
-    }
-  });
-}
-
-function startPumpProtection() {
-
-  cleanupPumpProtection();
-  
-  pumpTimer = Timer.set(MAX_PUMP_RUNTIME_MS, false, function () {
-    stopPump("timeout");
-  });
-
-  waterLevelCheckTimer = Timer.set(PROTECTION_CHECK_MS, true, checkWaterLevel);
-}
-
-function cleanupPumpProtection() {
-
-  if (pumpTimer) {
-    Timer.clear(pumpTimer);
-    pumpTimer = null;
-  }
-
-  if (waterLevelCheckTimer) {
-    Timer.clear(waterLevelCheckTimer);
-    waterLevelCheckTimer = null;
-  }
-}
-
-/************************************************
- * Blower protection
- ************************************************/
-function stopBlower(reason) {
-
-  cleanupBlowerProtection();
-  
-  Shelly.call("Switch.Set", {
-    id: 1,
-    on: false
-  });
-
-  print("Blower STOP:", reason);
-}
-
-function startBlowerProtection() {
-
-  cleanupBlowerProtection();
-
-  blowerTimer = Timer.set(BLOWER_RUNTIME_MS, false, function () {
-    stopBlower("timeout");
-  });
-}
-
-function cleanupBlowerProtection() {
-  if (blowerTimer) {
-    Timer.clear(blowerTimer);
-    blowerTimer = null;
-  }
-}
-
-/************************************************
  * Input and relay event handling
  ************************************************/
 function startEventAndStatusHandler() {
@@ -504,13 +409,9 @@ Shelly.call("Shelly.GetDeviceInfo", {}, function(res) {
   DEVICE_ID = res.id;
   print("Device ready:", DEVICE_ID);
 
-  stopPump("startup reset");
-  stopBlower("startup reset");
-  
   startPeriodicUpdate(PERIODIC_MQTTUPDATE);
   startEventAndStatusHandler();
   onMQTTReady();
-
 });
 
 print("Shelly Domoticz bridge started");
