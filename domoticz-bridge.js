@@ -1,6 +1,6 @@
 /************************************************
  * Shelly 2PM Gen4 -> Domoticz MQTT bridge
- * Ver 1.0
+ * Ver 1.1
  ************************************************/
 
 let DEVICE_NAME = "Vodojem";
@@ -28,6 +28,8 @@ let blowerTimer = null;
 
 let mqttReadyTimer1 = null;
 let mqttReadyTimer2 = null;
+
+let discoveryPublished = false;
 
 /************************************************
  * Helper functions
@@ -63,6 +65,7 @@ function scheduleDiscovery(delay) {
 
       publishHADiscovery();
       discoveryRunning = false;
+      discoveryPublished = true;
     });
   });
 }
@@ -98,12 +101,12 @@ function sendTemp(temp) {
 }
 
 function sendAnalog(percent) {
-  
+
   if (percent === null || percent === undefined) {
     print("Analog value not ready");
     return;
   }
-  
+
   lastAnalog = percent;
   mqttPublish("analog", percent.toFixed(1), true);
 }
@@ -196,6 +199,11 @@ function publishSensors() {
         print("Analog percent:", percent);
         sendAnalog(percent);
       }
+      else {
+        let percent = 100;
+        print("Analog percent:", percent);
+        sendAnalog(percent);
+      }
     }
   );
 }
@@ -204,7 +212,7 @@ function publishSensors() {
  * HA Discovery
  ********************************************/
    
-function publishHADiscovery() {
+function publishHADiscovery(done) {
 
   let items = [
     ["sensor", DEVICE_ID + "_temperature", { name: DEVICE_NAME + " Temperature", unique_id: DEVICE_ID + "_temperature", stat_t: topic("temperature"), unit_of_meas: "°C", dev_cla: "temperature", stat_cla: "measurement" }],
@@ -219,7 +227,9 @@ function publishHADiscovery() {
 
   function sendNext() {
     
-    if (i >= items.length) return;
+    if (i >= items.length) {
+      return;
+    }
 
     let item = items[i++];
     mqttPublishDiscovery(item[0], item[1], item[2]);
@@ -282,7 +292,10 @@ function onMQTTReady() {
   print("MQTT READY");
 
   mqttSubscribe();
-  scheduleDiscovery();
+  
+  if (!discoveryPublished) {
+    scheduleDiscovery();
+  }
 
   publishRelayStates();
  
