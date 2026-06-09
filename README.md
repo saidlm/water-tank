@@ -1,2 +1,1 @@
-# water-tank
-Automation of water tank based on Shely module
+# Water tank automation
