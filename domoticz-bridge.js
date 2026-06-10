@@ -335,24 +335,7 @@ function startEventAndStatusHandler() {
     if (e.component.indexOf("switch:") === 0) {
       let id = e.component.split(":")[1];
       let output = e.delta.output;
-      if (output !== undefined) {
-        
-        if (id === "0") {
-          if (output === true) {
-            startPumpProtection();
-          } else {
-            cleanupPumpProtection();  
-          }
-        }
-        
-        if (id === "1") {
-          if (output === true) {
-            startBlowerProtection();
-          } else {
-            cleanupBlowerProtection();  
-          }
-        }
-                 
+      if (output !== undefined) {               
         sendRelay(id, output);
         print("Relay", id, output);
       }
